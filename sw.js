@@ -1,4 +1,4 @@
-const CACHE = 'geocarte-v12';
+const CACHE = 'geocarte-v13';
 
 const PRECACHE_FILES = [
     './',

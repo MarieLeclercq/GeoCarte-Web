@@ -165,18 +165,50 @@ function hideDrawTools() {
     document.getElementById('draw-palette').classList.add('hidden');
 }
 
-// ========== LEAFLET DRAW EVENTS ==========
+// ========== DRAW EVENTS (DOM touch support for iPad) ==========
+let _eventsSetup = false;
+
 function setupLeafletEvents() {
-    leafletMap.on('mousedown', onDown);
-    leafletMap.on('mousemove', onMove);
-    leafletMap.on('mouseup', onUp);
-    leafletMap.on('dblclick', onDblClick);
+    if (_eventsSetup) return;
+    _eventsSetup = true;
+    const container = document.getElementById('canvas-container');
+
+    container.addEventListener('mousedown', e => onPointerDown(e));
+    container.addEventListener('mousemove', e => onPointerMove(e));
+    container.addEventListener('mouseup', e => onPointerUp(e));
+    container.addEventListener('mouseleave', e => { if (isDrawing) onPointerUp(e); });
+
+    container.addEventListener('touchstart', e => {
+        if (editorMode !== 'draw') return;
+        e.preventDefault();
+        const t = e.touches[0];
+        onPointerDown({ clientX: t.clientX, clientY: t.clientY });
+    }, { passive: false });
+
+    container.addEventListener('touchmove', e => {
+        if (editorMode !== 'draw' || !isDrawing) return;
+        e.preventDefault();
+        const t = e.touches[0];
+        onPointerMove({ clientX: t.clientX, clientY: t.clientY });
+    }, { passive: false });
+
+    container.addEventListener('touchend', e => {
+        if (editorMode !== 'draw') return;
+        e.preventDefault();
+        const t = e.changedTouches[0];
+        onPointerUp({ clientX: t.clientX, clientY: t.clientY });
+    }, { passive: false });
 }
 
-function onDown(e) {
+function containerXY(clientX, clientY) {
+    const rect = document.getElementById('leaflet-map').getBoundingClientRect();
+    return { x: clientX - rect.left, y: clientY - rect.top };
+}
+
+function onPointerDown(e) {
     if (editorMode !== 'draw') return;
     if (!isDrawingTool(currentTool) && currentTool !== 'select') return;
-    const px = e.containerPoint.x, py = e.containerPoint.y;
+    const { x: px, y: py } = containerXY(e.clientX, e.clientY);
     startX = px; startY = py;
     isDrawing = true;
 
@@ -195,9 +227,9 @@ function onDown(e) {
     }
 }
 
-function onMove(e) {
+function onPointerMove(e) {
     if (editorMode !== 'draw' || !isDrawing) return;
-    const px = e.containerPoint.x, py = e.containerPoint.y;
+    const { x: px, y: py } = containerXY(e.clientX, e.clientY);
 
     if (currentTool === 'select' && selectedElement) {
         const newAnchor = toLatLng(px - selectedElement._dragOffX, py - selectedElement._dragOffY);
@@ -219,13 +251,12 @@ function onMove(e) {
     }
 }
 
-function onUp(e) {
+function onPointerUp(e) {
     if (editorMode !== 'draw' || !isDrawing) return;
     isDrawing = false;
+    const { x: px, y: py } = containerXY(e.clientX, e.clientY);
 
-    const px = e.containerPoint.x, py = e.containerPoint.y;
-
-    if (currentTool === 'select') return;
+    if (currentTool === 'select') { renderCanvas(); return; }
 
     if (currentTool === 'freehand' || currentTool === 'pen' || currentTool === 'highlighter') {
         if (currentPath.length > 1) {
@@ -268,11 +299,14 @@ function onUp(e) {
 
 function onDblClick(e) {
     if (editorMode !== 'draw' || currentTool !== 'text') return;
+    const { x: px, y: py } = containerXY(e.clientX, e.clientY);
+    const ll = toLatLng(px, py);
+    if (!ll) return;
     const text = prompt('Texte :');
     if (text) {
         addElement({
             id: Date.now().toString(), type: 'text',
-            anchorLat: e.latlng.lat, anchorLng: e.latlng.lng, text,
+            anchorLat: ll.lat, anchorLng: ll.lng, text,
             fontSize: 16, fontWeight: 'bold', color: strokeColor,
             layerId: activeLayerId
         });
