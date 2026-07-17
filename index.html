@@ -204,10 +204,19 @@
         <header class="header editor-header">
             <button class="icon-btn" onclick="closeEditor()">🏠</button>
             <h1 id="editor-title">Carte</h1>
+            <div class="mode-toggle" id="mode-toggle">
+                <button class="mode-btn active" id="mode-navigate" onclick="setMode('navigate')">
+                    <span class="mode-icon">✋</span> Déplacer
+                </button>
+                <button class="mode-btn" id="mode-draw" onclick="setMode('draw')">
+                    <span class="mode-icon">✏️</span> Dessiner
+                </button>
+            </div>
             <div class="header-actions">
                 <button class="icon-btn" onclick="toggleSearch()">🔍</button>
                 <button class="icon-btn" onclick="undo()">↩️</button>
                 <button class="icon-btn" onclick="redo()">↪️</button>
+                <button class="icon-btn" id="legend-toggle" onclick="toggleLegend()">📋</button>
                 <button class="icon-btn" onclick="toggleLayers()">📑</button>
                 <button class="icon-btn" onclick="saveMap()">💾</button>
                 <button class="icon-btn" onclick="exportMap()">📤</button>
@@ -217,7 +226,7 @@
             <div id="canvas-container" class="canvas-container">
                 <div id="leaflet-map"></div>
                 <canvas id="map-canvas"></canvas>
-                <div id="search-overlay" class="search-overlay">
+                <div id="search-overlay" class="search-overlay hidden">
                     <div class="search-overlay-inner">
                         <div class="search-bar" style="margin:0;">
                             <span class="search-icon">🔍</span>
@@ -227,27 +236,26 @@
                         <div id="search-results" class="search-results"></div>
                     </div>
                 </div>
+                <div class="draw-palette hidden" id="draw-palette">
+                    <button class="draw-tool" onclick="selectTool('select', this)" title="Sélectionner / Déplacer">👆</button>
+                    <div class="tool-separator"></div>
+                    <button class="draw-tool" data-tool="rectangle" onclick="selectTool('rectangle', this)" title="Rectangle">⬜</button>
+                    <button class="draw-tool" data-tool="circle" onclick="selectTool('circle', this)" title="Cercle">⭕</button>
+                    <button class="draw-tool" data-tool="triangle" onclick="selectTool('triangle', this)" title="Triangle">🔺</button>
+                    <button class="draw-tool" data-tool="star" onclick="selectTool('star', this)" title="Étoile">⭐</button>
+                    <button class="draw-tool" data-tool="arrow" onclick="selectTool('arrow', this)" title="Flèche">➡️</button>
+                    <div class="tool-separator"></div>
+                    <button class="draw-tool" data-tool="line" onclick="selectTool('line', this)" title="Ligne">📏</button>
+                    <div class="tool-separator"></div>
+                    <button class="draw-tool" data-tool="freehand" onclick="selectTool('freehand', this)" title="Pinceau">✏️</button>
+                    <button class="draw-tool" data-tool="pen" onclick="selectTool('pen', this)" title="Stylo">🖊️</button>
+                    <button class="draw-tool" data-tool="highlighter" onclick="selectTool('highlighter', this)" title="Surligneur">🖍️</button>
+                    <button class="draw-tool" data-tool="eraser" onclick="selectTool('eraser', this)" title="Gomme">🧹</button>
+                    <div class="tool-separator"></div>
+                    <button class="draw-tool" data-tool="text" onclick="selectTool('text', this)" title="Texte">📝</button>
+                </div>
             </div>
-            <div id="trash-zone" class="trash-zone hidden"><span class="trash-icon">🗑️</span><span class="trash-label">Supprimer</span></div>
-            <div class="tool-palette">
-                <button class="tool active" onclick="selectTool('select', this)" title="Sélection">👆</button>
-                <div class="tool-separator"></div>
-                <button class="tool" onclick="selectTool('rectangle', this)" title="Rectangle">⬜</button>
-                <button class="tool" onclick="selectTool('circle', this)" title="Cercle">⭕</button>
-                <button class="tool" onclick="selectTool('triangle', this)" title="Triangle">🔺</button>
-                <button class="tool" onclick="selectTool('star', this)" title="Étoile">⭐</button>
-                <button class="tool" onclick="selectTool('arrow', this)" title="Flèche">➡️</button>
-                <div class="tool-separator"></div>
-                <button class="tool" onclick="selectTool('line', this)" title="Ligne">📏</button>
-                <div class="tool-separator"></div>
-                <button class="tool" onclick="selectTool('freehand', this)" title="Pinceau">✏️</button>
-                <button class="tool" onclick="selectTool('pen', this)" title="Stylo">🖊️</button>
-                <button class="tool" onclick="selectTool('highlighter', this)" title="Surligneur">🖍️</button>
-                <button class="tool" onclick="selectTool('eraser', this)" title="Gomme">🧹</button>
-                <div class="tool-separator"></div>
-                <button class="tool" onclick="selectTool('text', this)" title="Texte">📝</button>
-            </div>
-            <div class="properties-bar">
+            <div class="properties-bar" id="properties-bar">
                 <div class="prop-group">
                     <label>Trait</label>
                     <input type="color" id="stroke-color" value="#007AFF" onchange="updateStrokeColor(this.value)">
@@ -277,6 +285,17 @@
                         <option value="grid">Quadrillage</option>
                     </select>
                 </div>
+            </div>
+            <div id="trash-zone" class="trash-zone hidden"><span class="trash-icon">🗑️</span><span class="trash-label">Supprimer</span></div>
+        </div>
+        <div id="legend-panel" class="legend-panel hidden">
+            <div class="legend-panel-header">
+                <h3>Légende</h3>
+                <button class="icon-btn" onclick="addLegendItem()">+</button>
+            </div>
+            <div id="legend-list" class="legend-list"></div>
+            <div class="legend-panel-footer">
+                <p class="legend-hint">Glissez pour réordonner. Appuyez sur ✏️ pour changer la forme.</p>
             </div>
         </div>
         <div id="layer-panel" class="layer-panel hidden">

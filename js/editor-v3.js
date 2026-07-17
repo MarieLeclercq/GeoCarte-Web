@@ -1,5 +1,6 @@
 // ========== EDITOR STATE ==========
 let canvas, ctx, leafletMap;
+let editorMode = 'navigate'; // 'navigate' | 'draw'
 let currentTool = 'select';
 let isDrawing = false;
 let startX = 0, startY = 0;
@@ -15,11 +16,13 @@ let fillPattern = 'solid';
 let currentPath = [];
 let layers = [{ id: '1', name: 'Calque 1', visible: true, locked: false }];
 let activeLayerId = '1';
-let leafletEventsSetup = false;
 
 const DRAW_TOOLS = ['freehand','pen','highlighter','eraser','rectangle','circle','triangle','star','arrow','line','text'];
-
 function isDrawingTool(tool) { return DRAW_TOOLS.includes(tool); }
+
+// ========== LEGEND STATE ==========
+let legendItems = [];
+let legendVisible = false;
 
 // ========== GEO HELPERS ==========
 function toLatLng(x, y) {
@@ -42,25 +45,29 @@ function openMap(id) {
     layers = currentMap.layers || [{ id: '1', name: 'Calque 1', visible: true, locked: false }];
     elements = [];
     layers.forEach(l => (l.elements || []).forEach(e => elements.push(e)));
+    legendItems = currentMap.legendItems || [];
     canvas = document.getElementById('map-canvas');
     ctx = canvas.getContext('2d');
     selectedElement = null;
+    editorMode = 'navigate';
     setTimeout(() => {
         initLeafletMap();
         resizeCanvas();
         renderLayers();
         renderCanvas();
-        selectTool('select', document.querySelector('.tool'));
+        updateModeUI();
+        renderLegend();
     }, 150);
 }
 
 function closeEditor() {
     saveMap();
-    if (leafletMap) { leafletMap.remove(); leafletMap = null; leafletEventsSetup = false; }
+    if (leafletMap) { leafletMap.remove(); leafletMap = null; }
     document.getElementById('editor').classList.add('hidden');
     document.getElementById('app').classList.remove('hidden');
-    const so = document.getElementById('search-overlay');
-    if (so) so.classList.add('hidden');
+    document.getElementById('search-overlay')?.classList.add('hidden');
+    document.getElementById('legend-panel')?.classList.add('hidden');
+    legendVisible = false;
     renderMaps();
 }
 
@@ -82,7 +89,7 @@ function initLeafletMap() {
         if (currentMap) currentMap.mapView = { center: [leafletMap.getCenter().lat, leafletMap.getCenter().lng], zoom: leafletMap.getZoom() };
         renderCanvas();
     });
-    if (!leafletEventsSetup) { setupLeafletEvents(); leafletEventsSetup = true; }
+    setupLeafletEvents();
 }
 
 function getTileLayer(style) {
@@ -112,10 +119,50 @@ function getTileLayer(style) {
 
 function resizeCanvas() {
     const c = document.getElementById('canvas-container');
+    if (!canvas || !c) return;
     canvas.width = c.clientWidth;
     canvas.height = c.clientHeight;
     canvas.style.width = c.clientWidth + 'px';
     canvas.style.height = c.clientHeight + 'px';
+}
+
+// ========== MODE TOGGLE ==========
+function setMode(mode) {
+    editorMode = mode;
+    if (mode === 'navigate') {
+        leafletMap.dragging.enable();
+        leafletMap.touchZoom.enable();
+        leafletMap.scrollWheelZoom.enable();
+        leafletMap.doubleClickZoom.enable();
+        currentTool = 'select';
+        selectedElement = null;
+        canvas.style.cursor = 'default';
+        hideDrawTools();
+    } else {
+        leafletMap.dragging.disable();
+        leafletMap.touchZoom.disable();
+        leafletMap.scrollWheelZoom.disable();
+        leafletMap.doubleClickZoom.disable();
+        if (!currentTool || currentTool === 'select') {
+            selectTool('rectangle', document.querySelector('.draw-tool[data-tool="rectangle"]'));
+        }
+        showDrawTools();
+    }
+    updateModeUI();
+    renderCanvas();
+}
+
+function updateModeUI() {
+    document.getElementById('mode-navigate').classList.toggle('active', editorMode === 'navigate');
+    document.getElementById('mode-draw').classList.toggle('active', editorMode === 'draw');
+    document.getElementById('draw-palette').classList.toggle('hidden', editorMode !== 'draw');
+}
+
+function showDrawTools() {
+    document.getElementById('draw-palette').classList.remove('hidden');
+}
+function hideDrawTools() {
+    document.getElementById('draw-palette').classList.add('hidden');
 }
 
 // ========== LEAFLET DRAW EVENTS ==========
@@ -127,6 +174,7 @@ function setupLeafletEvents() {
 }
 
 function onDown(e) {
+    if (editorMode !== 'draw') return;
     if (!isDrawingTool(currentTool) && currentTool !== 'select') return;
     const px = e.containerPoint.x, py = e.containerPoint.y;
     startX = px; startY = py;
@@ -136,13 +184,11 @@ function onDown(e) {
         const el = findElementAt(px, py);
         if (el) {
             selectedElement = el;
-            leafletMap.dragging.disable();
         } else {
             selectedElement = null;
         }
         renderCanvas();
     } else {
-        leafletMap.dragging.disable();
         if (currentTool === 'freehand' || currentTool === 'pen' || currentTool === 'highlighter' || currentTool === 'eraser') {
             currentPath = [{ x: px, y: py }];
         }
@@ -150,13 +196,12 @@ function onDown(e) {
 }
 
 function onMove(e) {
-    if (!isDrawing) return;
+    if (editorMode !== 'draw' || !isDrawing) return;
     const px = e.containerPoint.x, py = e.containerPoint.y;
 
     if (currentTool === 'select' && selectedElement) {
-        const anchor = toLatLng(selectedElement.anchorPx, selectedElement.anchorPy);
         const newAnchor = toLatLng(px - selectedElement._dragOffX, py - selectedElement._dragOffY);
-        if (anchor && newAnchor) {
+        if (newAnchor) {
             selectedElement.anchorLat = newAnchor.lat;
             selectedElement.anchorLng = newAnchor.lng;
         }
@@ -175,9 +220,8 @@ function onMove(e) {
 }
 
 function onUp(e) {
-    if (!isDrawing) return;
+    if (editorMode !== 'draw' || !isDrawing) return;
     isDrawing = false;
-    leafletMap.dragging.enable();
 
     const px = e.containerPoint.x, py = e.containerPoint.y;
 
@@ -223,7 +267,7 @@ function onUp(e) {
 }
 
 function onDblClick(e) {
-    if (currentTool !== 'text') return;
+    if (editorMode !== 'draw' || currentTool !== 'text') return;
     const text = prompt('Texte :');
     if (text) {
         addElement({
@@ -239,7 +283,7 @@ function onDblClick(e) {
 // ========== TOOL SELECTION ==========
 function selectTool(tool, btn) {
     currentTool = tool;
-    document.querySelectorAll('.tool').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.draw-tool').forEach(t => t.classList.remove('active'));
     if (btn) btn.classList.add('active');
     canvas.style.cursor = tool === 'select' ? 'default' : 'crosshair';
     if (tool !== 'select') selectedElement = null;
@@ -249,7 +293,11 @@ function selectTool(tool, btn) {
 // ========== SEARCH ==========
 let searchTimeout = null;
 function toggleSearch() {
-    document.getElementById('search-input').focus();
+    const overlay = document.getElementById('search-overlay');
+    overlay.classList.toggle('hidden');
+    if (!overlay.classList.contains('hidden')) {
+        document.getElementById('search-input').focus();
+    }
 }
 function onSearchInput(val) {
     clearTimeout(searchTimeout);
@@ -291,7 +339,15 @@ function renderCanvas() {
         ctx.setLineDash([6, 3]);
         ctx.strokeStyle = '#007AFF';
         ctx.lineWidth = 2;
-        ctx.strokeRect(selectedElement._pxX - 4, selectedElement._pxY - 4, (selectedElement._drawW || 100) + 8, (selectedElement._drawH || 100) + 8);
+        const sx = selectedElement._pxX - 4;
+        const sy = selectedElement._pxY - 4;
+        const sw = (selectedElement._drawW || 100) + 8;
+        const sh = (selectedElement._drawH || 100) + 8;
+        if (selectedElement.type === 'freehand') {
+            ctx.strokeRect(sx, sy, sw, sh);
+        } else {
+            ctx.strokeRect(sx, sy, sw, sh);
+        }
         ctx.restore();
     }
 }
@@ -429,7 +485,7 @@ function drawPreview(x, y) {
     } else if (currentTool === 'triangle') {
         ctx.beginPath(); ctx.moveTo(px + w / 2, py); ctx.lineTo(px + w, py + h); ctx.lineTo(px, py + h); ctx.closePath();
         ctx.fill(); ctx.stroke();
-    } else if (currentTool === 'line') {
+    } else if (currentTool === 'line' || currentTool === 'arrow') {
         ctx.beginPath(); ctx.moveTo(startX, startY); ctx.lineTo(x, y); ctx.stroke();
     } else {
         ctx.strokeRect(px, py, w, h);
@@ -441,6 +497,8 @@ function drawPreview(x, y) {
 function findElementAt(x, y) {
     for (let i = elements.length - 1; i >= 0; i--) {
         const el = elements[i];
+        const layer = layers.find(l => l.id === el.layerId);
+        if (layer && (layer.locked || !layer.visible)) continue;
         if (el.type === 'freehand' && el._pxPath) {
             for (const p of el._pxPath) {
                 if (Math.abs(p.x - x) < 10 && Math.abs(p.y - y) < 10) {
@@ -551,6 +609,97 @@ function deleteSelectedElement() {
     renderLayers();
 }
 
+// ========== LEGEND ==========
+function toggleLegend() {
+    legendVisible = !legendVisible;
+    document.getElementById('legend-panel').classList.toggle('hidden', !legendVisible);
+    document.getElementById('legend-toggle').classList.toggle('active', legendVisible);
+}
+
+function renderLegend() {
+    const list = document.getElementById('legend-list');
+    if (!list) return;
+    list.innerHTML = legendItems.map((item, i) => `
+        <div class="legend-item" draggable="true" ondragstart="legendDragStart(event, ${i})" ondragover="legendDragOver(event)" ondrop="legendDrop(event, ${i})">
+            <div class="legend-item-grip" title="Glisser pour réordonner">⠿</div>
+            <div class="legend-swatch" style="background:${item.color}; border: 2px solid ${darken(item.color)};" data-shape="${item.shape}">${legendShapeIcon(item.shape)}</div>
+            <input type="text" class="legend-label-input" value="${escapeHtml(item.label)}" oninput="updateLegendLabel(${i}, this.value)" placeholder="Libellé...">
+            <div class="legend-item-actions">
+                <button class="icon-btn-sm" onclick="editLegendItem(${i})" title="Modifier">✏️</button>
+                <button class="icon-btn-sm" onclick="removeLegendItem(${i})" title="Supprimer">✕</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function legendShapeIcon(shape) {
+    switch(shape) {
+        case 'circle': return '<svg viewBox="0 0 16 16" width="14" height="14"><circle cx="8" cy="8" r="7" fill="white" stroke="none"/></svg>';
+        case 'triangle': return '<svg viewBox="0 0 16 16" width="14" height="14"><polygon points="8,1 15,15 1,15" fill="white" stroke="none"/></svg>';
+        case 'line': return '<svg viewBox="0 0 16 16" width="14" height="14"><line x1="2" y1="14" x2="14" y2="2" stroke="white" stroke-width="3"/></svg>';
+        case 'star': return '<svg viewBox="0 0 16 16" width="14" height="14"><polygon points="8,1 10,6 15,6 11,9 13,15 8,11 3,15 5,9 1,6 6,6" fill="white" stroke="none"/></svg>';
+        default: return '<svg viewBox="0 0 16 16" width="14" height="14"><rect x="1" y="1" width="14" height="14" rx="2" fill="white" stroke="none"/></svg>';
+    }
+}
+
+function darken(hex) {
+    let c = hex.replace('#', '');
+    if (c.length === 3) c = c[0]+c[0]+c[1]+c[1]+c[2]+c[2];
+    const r = Math.max(0, parseInt(c.substring(0,2), 16) - 40);
+    const g = Math.max(0, parseInt(c.substring(2,4), 16) - 40);
+    const b = Math.max(0, parseInt(c.substring(4,6), 16) - 40);
+    return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
+}
+
+function addLegendItem() {
+    legendItems.push({ shape: 'rectangle', color: '#007AFF', label: '' });
+    renderLegend();
+    saveMap();
+}
+
+function removeLegendItem(i) {
+    legendItems.splice(i, 1);
+    renderLegend();
+    saveMap();
+}
+
+function editLegendItem(i) {
+    const item = legendItems[i];
+    const shapes = ['rectangle', 'circle', 'triangle', 'line', 'star'];
+    const currentIdx = shapes.indexOf(item.shape);
+    item.shape = shapes[(currentIdx + 1) % shapes.length];
+    renderLegend();
+    saveMap();
+}
+
+function updateLegendLabel(i, val) {
+    legendItems[i].label = val;
+    saveMap();
+}
+
+function updateLegendColor(i, val) {
+    legendItems[i].color = val;
+    renderLegend();
+    saveMap();
+}
+
+let _legendDragIdx = null;
+function legendDragStart(e, i) { _legendDragIdx = i; e.dataTransfer.effectAllowed = 'move'; }
+function legendDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
+function legendDrop(e, i) {
+    e.preventDefault();
+    if (_legendDragIdx === null || _legendDragIdx === i) return;
+    const item = legendItems.splice(_legendDragIdx, 1)[0];
+    legendItems.splice(i, 0, item);
+    _legendDragIdx = null;
+    renderLegend();
+    saveMap();
+}
+
+function escapeHtml(s) {
+    return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 // ========== KEYBOARD ==========
 document.addEventListener('keydown', (e) => {
     if (!document.getElementById('editor') || document.getElementById('editor').classList.contains('hidden')) return;
@@ -559,18 +708,19 @@ document.addEventListener('keydown', (e) => {
     }
     if (e.ctrlKey && e.key === 'z') { e.preventDefault(); undo(); }
     if (e.ctrlKey && e.key === 'y') { e.preventDefault(); redo(); }
+    if (e.key === 'Escape' && editorMode === 'draw') { setMode('navigate'); }
 });
 
 // ========== SAVE ==========
 function saveMap() {
     if (!currentMap) return;
     currentMap.layers = layers;
+    currentMap.legendItems = legendItems;
     currentMap.updatedAt = new Date().toISOString();
     if (leafletMap) currentMap.mapView = { center: [leafletMap.getCenter().lat, leafletMap.getCenter().lng], zoom: leafletMap.getZoom() };
     const idx = maps.findIndex(m => m.id === currentMap.id);
     if (idx >= 0) maps[idx] = currentMap;
     saveData();
-    showToast('Carte sauvegardée');
 }
 
 function exportMap() {
