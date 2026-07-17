@@ -1,4 +1,4 @@
-const CACHE = 'geocarte-v10';
+const CACHE = 'geocarte-v12';
 
 const PRECACHE_FILES = [
     './',
@@ -57,6 +57,12 @@ self.addEventListener('activate', event => {
             Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
         ).then(() => self.clients.claim())
     );
+});
+
+self.addEventListener('message', event => {
+    if (event.data && event.data.type === 'SKIP_WAITING') {
+        self.skipWaiting();
+    }
 });
 
 self.addEventListener('fetch', event => {
