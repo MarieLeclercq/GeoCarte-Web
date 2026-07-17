@@ -1,0 +1,22 @@
+.editor-body { flex: 1; display: flex; flex-direction: column; position: relative; overflow: hidden; }
+.canvas-container { flex: 1; min-height: 0; overflow: hidden; position: relative; background: #E5E5EA; display: flex; align-items: center; justify-content: center; touch-action: none; }
+#map-canvas { box-shadow: 0 2px 20px rgba(0,0,0,0.1); cursor: crosshair; }
+
+.tool-palette { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 4px; padding: 8px; background: var(--glass); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-radius: 16px; border: 0.5px solid var(--border); z-index: 10; }
+.tool { width: 44px; height: 44px; border: none; border-radius: 10px; font-size: 18px; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.tool.active { background: var(--blue); }
+.tool:active { transform: scale(0.9); }
+.tool-separator { height: 1px; background: var(--border); margin: 2px 4px; }
+
+.properties-bar { display: flex; align-items: center; gap: 16px; padding: 10px 16px; background: var(--glass); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-top: 0.5px solid var(--border); overflow-x: auto; -webkit-overflow-scrolling: touch; touch-action: pan-x; min-height: 60px; }
+.prop-group { display: flex; flex-direction: column; gap: 4px; min-width: 60px; }
+.prop-group label { font-size: 10px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.3px; }
+.prop-group input[type="range"] { width: 80px; }
+
+.editor-header { background: var(--glass); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
+
+/* Canvas Grid */
+.canvas-container.show-grid #map-canvas { background-image: linear-gradient(rgba(0,0,0,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.05) 1px, transparent 1px); background-size: 20px 20px; }
+
+/* Selection */
+.element-selected { outline: 2px dashed var(--blue); outline-offset: 4px; }

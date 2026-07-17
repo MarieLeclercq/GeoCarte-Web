@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="GeoCarte">
+    <meta name="theme-color" content="#007AFF">
+    <title>GeoCarte</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="css/style-v3.css">
+    <link rel="stylesheet" href="css/editor-v3.css">
+    <link rel="stylesheet" href="css/components-v3.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body>
+    <div id="splash" class="splash">
+        <div class="splash-content">
+            <div class="splash-icon">🌍</div>
+            <h1>GeoCarte</h1>
+            <p>Cartographie pédagogique</p>
+            <div class="splash-loader"></div>
+        </div>
+    </div>
+
+    <div id="auth-screen" class="screen hidden">
+        <div class="auth-container">
+            <div class="auth-logo">
+                <span class="logo-icon">🌍</span>
+                <h1>GeoCarte</h1>
+                <p>Cartographie pédagogique interactive</p>
+            </div>
+            <div class="auth-form">
+                <div id="signup-fields" class="hidden">
+                    <div class="row">
+                        <input type="text" id="firstName" placeholder="Prénom" class="input">
+                        <input type="text" id="lastName" placeholder="Nom" class="input">
+                    </div>
+                </div>
+                <input type="email" id="email" placeholder="Email" class="input">
+                <input type="password" id="password" placeholder="Mot de passe" class="input">
+                <div id="role-selector" class="hidden">
+                    <div class="segmented-control">
+                        <button class="seg-btn active" data-role="student">Élève</button>
+                        <button class="seg-btn" data-role="teacher">Enseignant</button>
+                    </div>
+                </div>
+                <button id="auth-btn" class="btn btn-primary" onclick="authenticate()">Se connecter</button>
+                <button id="toggle-auth" class="btn-link" onclick="toggleAuth()">Pas de compte ? Créer un compte</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="app" class="screen hidden">
+        <header class="header">
+            <h1 id="page-title">Mes Cartes</h1>
+            <div class="header-actions">
+                <button class="icon-btn" onclick="showNewMap()">+</button>
+            </div>
+        </header>
+        <main class="main-content">
+            <div id="page-maps" class="page active">
+                <div class="search-bar">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" placeholder="Rechercher une carte..." oninput="filterMaps(this.value)">
+                </div>
+                <div class="filter-scroll">
+                    <button class="filter-chip active" onclick="filterByStyle(null, this)">Toutes</button>
+                    <button class="filter-chip" onclick="filterByStyle('political', this)">Politique</button>
+                    <button class="filter-chip" onclick="filterByStyle('physical', this)">Physique</button>
+                    <button class="filter-chip" onclick="filterByStyle('satellite', this)">Satellite</button>
+                    <button class="filter-chip" onclick="filterByStyle('blank', this)">Muette</button>
+                    <button class="filter-chip" onclick="filterByStyle('relief', this)">Relief</button>
+                    <button class="filter-chip" onclick="filterByStyle('climate', this)">Climatique</button>
+                </div>
+                <div id="maps-grid" class="maps-grid"></div>
+                <div id="empty-maps" class="empty-state">
+                    <div class="empty-icon">🗺️</div>
+                    <h2>Aucune carte</h2>
+                    <p>Créez votre première carte<br>pour commencer</p>
+                    <button class="btn btn-primary" onclick="showNewMap()">Créer une carte</button>
+                </div>
+            </div>
+
+            <div id="page-library" class="page">
+                <div class="search-bar">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" placeholder="Rechercher..." oninput="filterLibrary(this.value)">
+                </div>
+                <div class="filter-scroll">
+                    <button class="filter-chip active" onclick="filterLibraryRegion(null, this)">Toutes</button>
+                    <button class="filter-chip" onclick="filterLibraryRegion('monde', this)">Monde</button>
+                    <button class="filter-chip" onclick="filterLibraryRegion('europe', this)">Europe</button>
+                    <button class="filter-chip" onclick="filterLibraryRegion('france', this)">France</button>
+                    <button class="filter-chip" onclick="filterLibraryRegion('afrique', this)">Afrique</button>
+                    <button class="filter-chip" onclick="filterLibraryRegion('asie', this)">Asie</button>
+                    <button class="filter-chip" onclick="filterLibraryRegion('amerique', this)">Amériques</button>
+                </div>
+                <div id="library-grid" class="maps-grid"></div>
+            </div>
+
+            <div id="page-classes" class="page">
+                <div id="classes-list"></div>
+                <div id="empty-classes" class="empty-state">
+                    <div class="empty-icon">👥</div>
+                    <h2>Aucune classe</h2>
+                    <p>Créez votre première classe</p>
+                    <button class="btn btn-primary" onclick="showNewClass()">Créer une classe</button>
+                </div>
+            </div>
+
+            <div id="page-work" class="page">
+                <div class="empty-state" style="margin-bottom:16px;">
+                    <button class="btn btn-primary" onclick="showJoinClass()">Rejoindre une classe</button>
+                </div>
+                <div id="work-list"></div>
+                <div id="empty-work" class="empty-state">
+                    <div class="empty-icon">📝</div>
+                    <h2>Aucun devoir</h2>
+                    <p>Rejoignez une classe avec un code<br>pour voir les travaux</p>
+                </div>
+            </div>
+
+            <div id="page-quizzes" class="page">
+                <div class="empty-state" style="margin-bottom:16px;">
+                    <button class="btn btn-primary" onclick="showNewQuiz()">➕ Créer un Quiz</button>
+                </div>
+                <div id="quizzes-list"></div>
+                <div id="empty-quizzes" class="empty-state">
+                    <div class="empty-icon">❓</div>
+                    <h2>Aucun quiz</h2>
+                    <p>Créez des quiz géographiques<br>pour vos élèves</p>
+                </div>
+            </div>
+
+            <div id="page-settings" class="page">
+                <div class="settings-profile">
+                    <div class="avatar" id="user-avatar">?</div>
+                    <div>
+                        <h3 id="user-name">Utilisateur</h3>
+                        <p id="user-email" class="text-secondary">email</p>
+                        <span class="badge" id="user-role">Élève</span>
+                    </div>
+                </div>
+                <div class="settings-group">
+                    <h4>Apparence</h4>
+                    <div class="setting-row">
+                        <span>Mode sombre</span>
+                        <label class="toggle">
+                            <input type="checkbox" id="dark-mode" onchange="toggleDarkMode()">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+                <div class="settings-group">
+                    <h4>Données</h4>
+                    <button class="setting-row" onclick="exportData()">
+                        <span>Exporter les données</span><span>→</span>
+                    </button>
+                </div>
+                <div class="settings-group">
+                    <h4>À propos</h4>
+                    <div class="setting-row"><span>Version</span><span class="text-secondary">2.1</span></div>
+                    <div class="setting-row"><span>Plateforme</span><span class="text-secondary">Web App</span></div>
+                </div>
+                <button class="btn btn-danger" onclick="logout()">Se déconnecter</button>
+            </div>
+        </main>
+        <nav class="tab-bar">
+            <button class="tab active" onclick="switchTab('maps', this)" data-tab="maps">
+                <span class="tab-icon">🗺️</span><span class="tab-label">Cartes</span>
+            </button>
+            <button class="tab" onclick="switchTab('library', this)" data-tab="library">
+                <span class="tab-icon">📚</span><span class="tab-label">Bibliothèque</span>
+            </button>
+            <button class="tab teacher-only" onclick="switchTab('classes', this)" data-tab="classes">
+                <span class="tab-icon">👥</span><span class="tab-label">Classes</span>
+            </button>
+            <button class="tab teacher-only" onclick="switchTab('quizzes', this)" data-tab="quizzes">
+                <span class="tab-icon">❓</span><span class="tab-label">Quiz</span>
+            </button>
+            <button class="tab student-only" onclick="switchTab('work', this)" data-tab="work">
+                <span class="tab-icon">📝</span><span class="tab-label">Travaux</span>
+            </button>
+            <button class="tab student-only" onclick="switchTab('quizzes', this)" data-tab="quizzes">
+                <span class="tab-icon">❓</span><span class="tab-label">Quiz</span>
+            </button>
+            <button class="tab" onclick="switchTab('settings', this)" data-tab="settings">
+                <span class="tab-icon">⚙️</span><span class="tab-label">Réglages</span>
+            </button>
+        </nav>
+    </div>
+
+    <div id="editor" class="screen hidden">
+        <header class="header editor-header">
+            <button class="icon-btn" onclick="closeEditor()">🏠</button>
+            <h1 id="editor-title">Carte</h1>
+            <div class="header-actions">
+                <button class="icon-btn" onclick="toggleSearch()">🔍</button>
+                <button class="icon-btn" onclick="undo()">↩️</button>
+                <button class="icon-btn" onclick="redo()">↪️</button>
+                <button class="icon-btn" onclick="toggleLayers()">📑</button>
+                <button class="icon-btn" onclick="saveMap()">💾</button>
+                <button class="icon-btn" onclick="exportMap()">📤</button>
+            </div>
+        </header>
+        <div class="editor-body">
+            <div id="canvas-container" class="canvas-container">
+                <div id="leaflet-map"></div>
+                <canvas id="map-canvas"></canvas>
+                <div id="search-overlay" class="search-overlay">
+                    <div class="search-overlay-inner">
+                        <div class="search-bar" style="margin:0;">
+                            <span class="search-icon">🔍</span>
+                            <input type="text" id="search-input" placeholder="Rechercher un lieu..." oninput="onSearchInput(this.value)">
+                            <button class="icon-btn" onclick="toggleSearch()" style="width:32px;height:32px;font-size:14px;">✕</button>
+                        </div>
+                        <div id="search-results" class="search-results"></div>
+                    </div>
+                </div>
+            </div>
+            <div id="trash-zone" class="trash-zone hidden"><span class="trash-icon">🗑️</span><span class="trash-label">Supprimer</span></div>
+            <div class="tool-palette">
+                <button class="tool active" onclick="selectTool('select', this)" title="Sélection">👆</button>
+                <div class="tool-separator"></div>
+                <button class="tool" onclick="selectTool('rectangle', this)" title="Rectangle">⬜</button>
+                <button class="tool" onclick="selectTool('circle', this)" title="Cercle">⭕</button>
+                <button class="tool" onclick="selectTool('triangle', this)" title="Triangle">🔺</button>
+                <button class="tool" onclick="selectTool('star', this)" title="Étoile">⭐</button>
+                <button class="tool" onclick="selectTool('arrow', this)" title="Flèche">➡️</button>
+                <div class="tool-separator"></div>
+                <button class="tool" onclick="selectTool('line', this)" title="Ligne">📏</button>
+                <div class="tool-separator"></div>
+                <button class="tool" onclick="selectTool('freehand', this)" title="Pinceau">✏️</button>
+                <button class="tool" onclick="selectTool('pen', this)" title="Stylo">🖊️</button>
+                <button class="tool" onclick="selectTool('highlighter', this)" title="Surligneur">🖍️</button>
+                <button class="tool" onclick="selectTool('eraser', this)" title="Gomme">🧹</button>
+                <div class="tool-separator"></div>
+                <button class="tool" onclick="selectTool('text', this)" title="Texte">📝</button>
+            </div>
+            <div class="properties-bar">
+                <div class="prop-group">
+                    <label>Trait</label>
+                    <input type="color" id="stroke-color" value="#007AFF" onchange="updateStrokeColor(this.value)">
+                </div>
+                <div class="prop-group">
+                    <label>Remplissage</label>
+                    <input type="color" id="fill-color" value="#007AFF" onchange="updateFillColor(this.value)">
+                </div>
+                <div class="prop-group">
+                    <label>Épaisseur</label>
+                    <input type="range" id="stroke-width" min="1" max="20" value="2" oninput="updateStrokeWidth(this.value)">
+                </div>
+                <div class="prop-group">
+                    <label>Opacité</label>
+                    <input type="range" id="opacity" min="0" max="100" value="100" oninput="updateOpacity(this.value)">
+                </div>
+                <div class="prop-group">
+                    <label>Motif</label>
+                    <select id="fill-pattern" onchange="updateFillPattern(this.value)">
+                        <option value="solid">Plein</option>
+                        <option value="hatched">Hachures</option>
+                        <option value="dots">Points</option>
+                        <option value="crosses">Croix</option>
+                        <option value="horizontal">Rayures H</option>
+                        <option value="vertical">Rayures V</option>
+                        <option value="diagonal">Rayures obliques</option>
+                        <option value="grid">Quadrillage</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div id="layer-panel" class="layer-panel hidden">
+            <div class="panel-header">
+                <h3>Calques</h3>
+                <button class="icon-btn" onclick="addLayer()">+</button>
+            </div>
+            <div id="layers-list" class="layers-list"></div>
+        </div>
+    </div>
+
+    <div id="new-map-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Nouvelle Carte</h2>
+                <button class="icon-btn" onclick="closeModal('new-map-modal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <input type="text" id="new-map-name" placeholder="Nom de la carte" class="input">
+                <textarea id="new-map-desc" placeholder="Description (optionnel)" class="input" rows="2"></textarea>
+                <h4>Style de carte</h4>
+                <div class="style-grid" id="style-grid"></div>
+                <h4>Projection</h4>
+                <div class="projection-list" id="projection-list"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('new-map-modal')">Annuler</button>
+                <button class="btn btn-primary" onclick="createMap()">Créer</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="edit-map-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Modifier la carte</h2>
+                <button class="icon-btn" onclick="closeModal('edit-map-modal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <input type="text" id="edit-map-name" placeholder="Nom de la carte" class="input">
+                <textarea id="edit-map-desc" placeholder="Description" class="input" rows="2"></textarea>
+                <h4>Style de carte</h4>
+                <div class="style-grid" id="edit-style-grid"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" onclick="deleteEditingMap()">🗑️ Supprimer</button>
+                <button class="btn btn-primary" onclick="saveEditMap()">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="new-class-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Nouvelle Classe</h2>
+                <button class="icon-btn" onclick="closeModal('new-class-modal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <input type="text" id="class-name" placeholder="Nom de la classe (ex: 6ème A)" class="input">
+                <input type="text" id="class-subject" placeholder="Matière (ex: Géographie)" class="input">
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('new-class-modal')">Annuler</button>
+                <button class="btn btn-primary" onclick="createClass()">Créer</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="join-class-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Rejoindre une classe</h2>
+                <button class="icon-btn" onclick="closeModal('join-class-modal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <p style="color:var(--text2);margin-bottom:12px;">Entrez le code donné par votre enseignant</p>
+                <input type="text" id="join-code" placeholder="Code de la classe" class="input" maxlength="6" style="text-align:center;font-size:24px;letter-spacing:8px;text-transform:uppercase;">
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('join-class-modal')">Annuler</button>
+                <button class="btn btn-primary" onclick="joinClass()">Rejoindre</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="class-detail-modal" class="modal hidden">
+        <div class="modal-content" style="max-height:85vh;">
+            <div class="modal-header">
+                <h2 id="class-detail-title">Classe</h2>
+                <button class="icon-btn" onclick="closeModal('class-detail-modal')">✕</button>
+            </div>
+            <div class="modal-body" id="class-detail-body"></div>
+        </div>
+    </div>
+
+    <div id="new-quiz-modal" class="modal hidden">
+        <div class="modal-content" style="max-height:90vh;">
+            <div class="modal-header">
+                <h2>Nouveau Quiz</h2>
+                <button class="icon-btn" onclick="closeModal('new-quiz-modal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <input type="text" id="quiz-title" placeholder="Titre du quiz" class="input">
+                <textarea id="quiz-desc" placeholder="Description (optionnel)" class="input" rows="2"></textarea>
+                <div class="form-group" style="margin-top:12px;">
+                    <label style="font-size:13px;color:var(--text2);font-weight:500;">Classe assignée</label>
+                    <select id="quiz-class" class="input" style="margin-top:4px;"></select>
+                </div>
+                <h4 style="margin-top:16px;">Questions</h4>
+                <div id="quiz-questions-list"></div>
+                <button class="btn btn-secondary" onclick="addQuizQuestion()" style="width:100%;margin-top:12px;">➕ Ajouter une question</button>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('new-quiz-modal')">Annuler</button>
+                <button class="btn btn-primary" onclick="saveQuiz()">Créer le Quiz</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="play-quiz-modal" class="modal hidden">
+        <div class="modal-content" style="max-height:90vh;">
+            <div class="modal-header">
+                <h2 id="play-quiz-title">Quiz</h2>
+                <button class="icon-btn" onclick="closeModal('play-quiz-modal')">✕</button>
+            </div>
+            <div class="modal-body" id="play-quiz-body"></div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="js/app-v3.js"></script>
+    <script src="js/editor-v3.js"></script>
+    <script src="js/storage-v3.js"></script>
+</body>
+</html>
