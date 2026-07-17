@@ -1,6 +1,6 @@
-const CACHE = 'geocarte-v8';
+const CACHE = 'geocarte-v9';
 
-const PRECACHE = [
+const PRECACHE_FILES = [
     './',
     './index.html',
     './manifest.json',
@@ -21,11 +21,33 @@ const PRECACHE = [
     './img/icon-512.png'
 ];
 
+function generateTileUrls() {
+    const urls = [];
+    for (let z = 0; z <= 4; z++) {
+        const max = Math.pow(2, z);
+        for (let x = 0; x < max; x++) {
+            for (let y = 0; y < max; y++) {
+                urls.push(`https://tile.openstreetmap.org/${z}/${x}/${y}.png`);
+            }
+        }
+    }
+    return urls;
+}
+
 self.addEventListener('install', event => {
     event.waitUntil(
-        caches.open(CACHE)
-            .then(cache => cache.addAll(PRECACHE))
-            .then(() => self.skipWaiting())
+        caches.open(CACHE).then(cache => {
+            return cache.addAll(PRECACHE_FILES).then(() => {
+                const tileUrls = generateTileUrls();
+                return Promise.allSettled(
+                    tileUrls.map(url =>
+                        fetch(url).then(r => {
+                            if (r.ok) return cache.put(url, r);
+                        }).catch(() => {})
+                    )
+                );
+            });
+        }).then(() => self.skipWaiting())
     );
 });
 
@@ -40,15 +62,26 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
     const url = event.request.url;
 
-    if (url.includes('tile.openstreetmap.org') || url.includes('arcgisonline.com') || url.includes('basemaps.cartocdn.com') || url.includes('nominatim.openstreetmap.org')) {
+    if (url.includes('tile.openstreetmap.org') || url.includes('arcgisonline.com') || url.includes('basemaps.cartocdn.com')) {
         event.respondWith(
-            caches.open('geocarte-tiles').then(cache =>
+            caches.open(CACHE).then(cache =>
                 cache.match(event.request).then(cached => {
                     if (cached) return cached;
                     return fetch(event.request).then(response => {
                         if (response.ok) cache.put(event.request, response.clone());
                         return response;
-                    }).catch(() => new Response('', { status: 503 }));
+                    }).catch(() => new Response('', { status: 503, statusText: 'Offline' }));
+                })
+            )
+        );
+        return;
+    }
+
+    if (url.includes('nominatim.openstreetmap.org')) {
+        event.respondWith(
+            fetch(event.request).catch(() =>
+                new Response(JSON.stringify([{ display_name: 'Recherche hors ligne non disponible' }]), {
+                    headers: { 'Content-Type': 'application/json' }
                 })
             )
         );

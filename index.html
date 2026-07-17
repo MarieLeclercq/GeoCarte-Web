@@ -32,22 +32,30 @@
                 <p>Cartographie pédagogique interactive</p>
             </div>
             <div class="auth-form">
-                <div id="signup-fields" class="hidden">
-                    <div class="row">
-                        <input type="text" id="firstName" placeholder="Prénom" class="input">
-                        <input type="text" id="lastName" placeholder="Nom" class="input">
-                    </div>
+                <div class="segmented-control">
+                    <button class="seg-btn active" data-role="student" onclick="setAuthRole('student')">Élève</button>
+                    <button class="seg-btn" data-role="teacher" onclick="setAuthRole('teacher')">Enseignant</button>
                 </div>
-                <input type="email" id="email" placeholder="Email" class="input">
-                <input type="password" id="password" placeholder="Mot de passe" class="input">
-                <div id="role-selector" class="hidden">
-                    <div class="segmented-control">
-                        <button class="seg-btn active" data-role="student">Élève</button>
-                        <button class="seg-btn" data-role="teacher">Enseignant</button>
-                    </div>
+
+                <div id="auth-student-fields">
+                    <input type="text" id="firstName" placeholder="Prénom" class="input">
+                    <input type="text" id="lastName" placeholder="Nom" class="input">
+                    <input type="text" id="classCode" placeholder="Code classe (ex: GEO3A)" class="input">
+                    <button id="auth-btn" class="btn btn-primary" onclick="authenticate()">Rejoindre</button>
                 </div>
-                <button id="auth-btn" class="btn btn-primary" onclick="authenticate()">Se connecter</button>
-                <button id="toggle-auth" class="btn-link" onclick="toggleAuth()">Pas de compte ? Créer un compte</button>
+
+                <div id="auth-teacher-fields" class="hidden">
+                    <div id="signup-fields" class="hidden">
+                        <div class="row">
+                            <input type="text" id="firstName" placeholder="Prénom" class="input">
+                            <input type="text" id="lastName" placeholder="Nom" class="input">
+                        </div>
+                    </div>
+                    <input type="email" id="email" placeholder="Email" class="input">
+                    <input type="password" id="password" placeholder="Mot de passe" class="input">
+                    <button id="auth-btn" class="btn btn-primary" onclick="authenticate()">Se connecter</button>
+                    <button id="toggle-auth" class="btn-link" onclick="toggleAuth()">Pas de compte ? Créer un compte</button>
+                </div>
             </div>
         </div>
     </div>

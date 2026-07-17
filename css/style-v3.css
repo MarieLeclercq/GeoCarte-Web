@@ -215,6 +215,8 @@ select { padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px;
 .quiz-score h2 { font-size: 48px; color: var(--blue); }
 .quiz-score p { font-size: 16px; color: var(--text2); margin-top: 8px; }
 .form-group { display: flex; flex-direction: column; gap: 4px; }
+#auth-student-fields, #auth-teacher-fields { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+.auth-form .segmented-control { margin-top: 16px; }
 
 /* iPad Optimizations */
 @media (min-width: 768px) {

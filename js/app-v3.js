@@ -63,37 +63,46 @@ function initApp() {
 }
 
 let isSignUp = false;
+let authRole = 'student';
+
+function setAuthRole(role) {
+    authRole = role;
+    document.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector(`.seg-btn[data-role="${role}"]`).classList.add('active');
+    document.getElementById('auth-student-fields').classList.toggle('hidden', role !== 'student');
+    document.getElementById('auth-teacher-fields').classList.toggle('hidden', role !== 'teacher');
+}
+
 function toggleAuth() {
     isSignUp = !isSignUp;
     document.getElementById('signup-fields').classList.toggle('hidden', !isSignUp);
-    document.getElementById('role-selector').classList.toggle('hidden', !isSignUp);
-    document.getElementById('auth-btn').textContent = isSignUp ? 'Créer un compte' : 'Se connecter';
+    document.querySelector('#auth-teacher-fields .btn-primary').textContent = isSignUp ? 'Créer un compte' : 'Se connecter';
     document.getElementById('toggle-auth').textContent = isSignUp ? 'Déjà un compte ? Se connecter' : 'Pas de compte ? Créer un compte';
 }
 
-document.querySelectorAll('.seg-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-        document.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-    });
-});
-
 function authenticate() {
-    const email = document.getElementById('email').value.trim();
-    const password = document.getElementById('password').value;
-    if (!email || !password) { showToast('Remplissez tous les champs'); return; }
-
-    if (isSignUp) {
+    if (authRole === 'student') {
         const firstName = document.getElementById('firstName').value.trim();
         const lastName = document.getElementById('lastName').value.trim();
-        const role = document.querySelector('.seg-btn.active').dataset.role;
-        if (!firstName || !lastName) { showToast('Remplissez votre nom et prénom'); return; }
-        currentUser = { email, firstName, lastName, role, createdAt: new Date().toISOString() };
+        const classCode = document.getElementById('classCode').value.trim().toUpperCase();
+        if (!firstName || !lastName || !classCode) { showToast('Remplissez tous les champs'); return; }
+        const email = firstName.toLowerCase() + '.' + lastName.toLowerCase() + '@eleve.local';
+        currentUser = { email, firstName, lastName, role: 'student', classCode, createdAt: new Date().toISOString() };
     } else {
-        const allUsers = JSON.parse(localStorage.getItem('geocarte_users') || '[]');
-        const u = allUsers.find(u => u.email === email);
-        if (u) { currentUser = u; }
-        else { showToast('Aucun compte trouvé'); return; }
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value;
+        if (!email || !password) { showToast('Remplissez tous les champs'); return; }
+        if (isSignUp) {
+            const firstName = document.getElementById('firstName').value.trim();
+            const lastName = document.getElementById('lastName').value.trim();
+            if (!firstName || !lastName) { showToast('Remplissez votre nom et prénom'); return; }
+            currentUser = { email, firstName, lastName, role: 'teacher', createdAt: new Date().toISOString() };
+        } else {
+            const allUsers = JSON.parse(localStorage.getItem('geocarte_users') || '[]');
+            const u = allUsers.find(u => u.email === email);
+            if (u) { currentUser = u; }
+            else { showToast('Aucun compte trouvé'); return; }
+        }
     }
     const allUsers = JSON.parse(localStorage.getItem('geocarte_users') || '[]');
     if (!allUsers.find(u => u.email === currentUser.email)) { allUsers.push(currentUser); localStorage.setItem('geocarte_users', JSON.stringify(allUsers)); }
@@ -106,7 +115,7 @@ function showApp() {
     document.getElementById('app').classList.remove('hidden');
     document.getElementById('user-avatar').textContent = currentUser.firstName[0];
     document.getElementById('user-name').textContent = currentUser.firstName + ' ' + currentUser.lastName;
-    document.getElementById('user-email').textContent = currentUser.email;
+    document.getElementById('user-email').textContent = currentUser.classCode || currentUser.email;
     document.getElementById('user-role').textContent = currentUser.role === 'teacher' ? 'Enseignant' : 'Élève';
     document.querySelectorAll('.teacher-only').forEach(el => el.style.display = currentUser.role === 'teacher' ? '' : 'none');
     document.querySelectorAll('.student-only').forEach(el => el.style.display = currentUser.role === 'student' ? '' : 'none');
